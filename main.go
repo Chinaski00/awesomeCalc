@@ -32,7 +32,7 @@ func romanToArabic(roman string) (int, error) {
 	for _, r := range roman {
 		value, ok := romanNumerals[r]
 		if !ok {
-			return 0, fmt.Errorf("invalid roman numeral")
+			return 0, fmt.Errorf("недопустимое римское число")
 		}
 
 		if value > prevValue {
@@ -49,32 +49,42 @@ func romanToArabic(roman string) (int, error) {
 
 // Функция для перевода арабского числа в римское.
 func arabicToRoman(arabic int) (string, error) {
-	if arabic <= 0 || arabic > 10 {
-		return "", fmt.Errorf("invalid arabic number: must be in range [1, 10]")
+	if arabic <= 0 {
+		return "", fmt.Errorf("недопустимое арабское число: должно быть положительным")
+	}
+
+	if arabic > 3999 {
+		return "", fmt.Errorf("недопустимое арабское число: превышено максимальное значение (3999)")
 	}
 
 	romanNumerals := map[int]string{
-		1:  "I",
-		2:  "II",
-		3:  "III",
-		4:  "IV",
-		5:  "V",
-		6:  "VI",
-		7:  "VII",
-		8:  "VIII",
-		9:  "IX",
-		10: "X",
+		1000: "M",
+		900:  "CM",
+		500:  "D",
+		400:  "CD",
+		100:  "C",
+		90:   "XC",
+		50:   "L",
+		40:   "XL",
+		10:   "X",
+		9:    "IX",
+		5:    "V",
+		4:    "IV",
+		1:    "I",
 	}
 
-	return romanNumerals[arabic], nil
+	romanNumber := ""
+	for value := range romanNumerals {
+		for arabic >= value {
+			romanNumber += romanNumerals[value]
+			arabic -= value
+		}
+	}
+
+	return romanNumber, nil
 }
 
-// Функция для проверки, является ли число арабским числом от 1 до 10 включительно.
-func isValidArabicNumber(number int) bool {
-	return number >= 1 && number <= 10
-}
-
-// Функция для выполнения операций калькулятора.
+// Функция для выполнения операций калькулятора
 func calculate(a, b int, operator string) (int, error) {
 	var result int
 	switch operator {
@@ -95,74 +105,85 @@ func calculate(a, b int, operator string) (int, error) {
 	return result, nil
 }
 
-func main() {
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
+// Функция для проверки, является ли строка числом от 1 до 10.
+func isValidNumber(s string) bool {
+	number, err := strconv.Atoi(s)
+	return err == nil && number >= 1 && number <= 10
+}
 
-	// Разделение строки на операнды и оператор.
+// Функция для парсинга операнда.
+func parseOperand(operand string) (int, error) {
+	if isValidNumber(operand) {
+		return strconv.Atoi(operand)
+	}
+
+	if isRomanNumber(operand) {
+		return romanToArabic(operand)
+	}
+
+	return 0, fmt.Errorf("недопустимый операнд")
+}
+
+// Функция для выполнения арифметических операций.
+func calculateExpression(input string) (string, error) {
 	tokens := strings.Split(input, " ")
 	if len(tokens) != 3 {
-		fmt.Println("Ошибка: неверный формат математической операции.")
-		return
+		return "", fmt.Errorf("неверный формат математической операции")
 	}
 
-	aStr, operator, bStr := tokens[0], tokens[1], tokens[2]
-
-	// Проверка операндов на валидность.
-	a, err := strconv.Atoi(aStr)
+	a, err := parseOperand(tokens[0])
 	if err != nil {
-		if isRomanNumber(aStr) {
-			// Если первый операнд - римское число, конвертируем его в арабское.
-			a, err = romanToArabic(aStr)
-			if err != nil {
-				fmt.Println("Ошибка:", err)
-				return
-			}
-		} else {
-			fmt.Println("Ошибка: недопустимый операнд.")
-			return
-		}
+		return "", err
 	}
 
-	b, err := strconv.Atoi(bStr)
+	operator := tokens[1]
+
+	b, err := parseOperand(tokens[2])
 	if err != nil {
-		if isRomanNumber(bStr) {
-			// Если второй операнд - римское число, конвертируем его в арабское.
-			b, err = romanToArabic(bStr)
-			if err != nil {
-				fmt.Println("Ошибка:", err)
-				return
-			}
-		} else {
-			fmt.Println("Ошибка: недопустимый операнд.")
-			return
-		}
+		return "", err
 	}
 
-	// Проверка операндов на допустимый диапазон.
-	if !isValidArabicNumber(a) || !isValidArabicNumber(b) {
-		fmt.Println("Ошибка: числа должны быть от 1 до 10 включительно.")
-		return
+	// Проверка, что оба операнда имеют одинаковый тип (арабские или римские числа).
+	if (isValidNumber(tokens[0]) && isRomanNumber(tokens[2])) || (isRomanNumber(tokens[0]) && isValidNumber(tokens[2])) {
+		return "", fmt.Errorf("используются одновременно разные системы счисления")
 	}
 
-	// Выполнение операции.
+	// Выполнение операции
 	result, err := calculate(a, b, operator)
 	if err != nil {
-		fmt.Println("Ошибка:", err)
-		return
+		return "", err
 	}
 
-	// Вывод результата.
-	if isRomanNumber(aStr) && isRomanNumber(bStr) {
-		// Если оба операнда римские числа, конвертируем результат в римское число.
+	// Вывод результата
+	if isRomanNumber(tokens[0]) && isRomanNumber(tokens[2]) {
 		romanResult, err := arabicToRoman(result)
 		if err != nil {
-			fmt.Println("Ошибка:", err)
-			return
+			return "", err
 		}
-		fmt.Println(romanResult)
-	} else {
-		fmt.Println(result)
+		return romanResult, nil
+	}
+
+	return strconv.Itoa(result), nil
+}
+
+func main() {
+	fmt.Println("Калькулятор. Введите математическое выражение (например, 1 + 2) или 'exit' для выхода.")
+	scanner := bufio.NewScanner(os.Stdin)
+
+	for {
+		scanner.Scan()
+		input := scanner.Text()
+
+		if input == "exit" {
+			break
+		}
+
+		result, err := calculateExpression(input)
+		if err != nil {
+			fmt.Println("Ошибка:", err)
+			continue
+		}
+
+		fmt.Println("Результат:", result)
 	}
 }
